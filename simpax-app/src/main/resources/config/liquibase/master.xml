@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!--
+        Master changelog: berfungsi sebagai daftar isi (table of contents)
+        untuk seluruh migrasi database SIMPAX. Setiap perubahan skema baru
+        ditambahkan sebagai <include> baris baru DI BAWAH (urutan menentukan
+        urutan eksekusi - jangan diubah urutannya setelah pernah dijalankan
+        di environment manapun, termasuk laptop sendiri).
+
+        Mengapa Liquibase (bukan Hibernate ddl-auto=update)?
+        1. Auditable: setiap perubahan skema tercatat sebagai file changelog
+           terversi, bisa di-review seperti code review biasa (relevan
+           dengan PRD Bab 12 - ISO 27001 Annex A domain Logging/Monitoring).
+        2. Reversibel: setiap changeSet bisa di-rollback secara terkontrol,
+           tidak seperti ddl-auto yang sifatnya best-effort dan bisa
+           kehilangan data tanpa peringatan pada kondisi tertentu.
+        3. Konsisten antar environment: developer lain (Zaskia, Sekar,
+           Regina) yang clone repo ini akan mendapat skema database yang
+           IDENTIK saat menjalankan aplikasi, tanpa perlu menjalankan
+           script SQL manual secara terpisah.
+    -->
+
+    <include file="config/liquibase/changelog/00000000000001_initial_schema.xml" relativeToChangelogFile="false"/>
+
+</databaseChangeLog>

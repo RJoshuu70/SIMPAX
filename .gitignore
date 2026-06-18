@@ -34,6 +34,9 @@ infra/**/*.key
 infra/**/*.pem
 **/application-secrets.yml
 *.local.yml
+simpax-app/config/keys/
+*.pem
+*.key
 
 ### === Docker volumes lokal (jika di-bind mount ke folder) === ###
 infra/postgres/data/

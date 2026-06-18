@@ -53,22 +53,63 @@ simpax/
 ## 4. Status Pengerjaan
 
 - [x] Tahap 0 — Struktur repo & skeleton dasar
-- [ ] Tahap 1 — JHipster app skeleton (entities: Role, User, BudgetsTransaction)
+- [~] Tahap 1 — Backend skeleton (entity, repository, JWT RS256) — **sedang berjalan**
 - [ ] Tahap 2 — Docker Compose dasar (Backend + PostgreSQL)
-- [ ] Tahap 3 — Integrasi Apache APISIX + etcd
-- [ ] Tahap 4 — Integrasi Apache Syncope (IAM)
-- [ ] Tahap 5 — Integrasi Apache Fortress (RBAC) *atau fallback OPA/Keycloak*
-- [ ] Tahap 6 — Modul bisnis (Kalkulator Pajak, Kwitansi & Faktur)
+- [ ] Tahap 3 — Integrasi Apache APISIX + etcd *(domain: Zaskia)*
+- [ ] Tahap 4 — Integrasi Apache Syncope (IAM) *(domain: Zaskia)*
+- [ ] Tahap 5 — Integrasi Apache Fortress (RBAC) — **cukup demonstrasi konsep** *(domain: Zaskia)*
+- [ ] Tahap 6 — Modul bisnis (Kalkulator Pajak, Kwitansi & Faktur, Saldo & Saham)
 - [ ] Tahap 7 — Dashboard, Audit Trail UI, Landing Page
 - [ ] Tahap 8 — Laporan akademik final
 
+> **Pembagian tugas tim:** Joshua (Backend Dev) — Zaskia (Security & Config Engineer) — Sekar (Security Tester) — Regina (Monitoring, Deployment & Dokumentasi). Detail di [`docs/diagrams/pembagian_tugas.md`](docs/diagrams/pembagian_tugas.md).
+
 ## 5. Catatan Risiko Penting
 
-> ⚠️ **Status Apache Fortress** sebagai komponen RBAC inti perlu divalidasi ulang sebelum implementasi penuh — terdapat indikasi proyek ini sudah dipindahkan ke Apache Attic (retired status) dan tidak lagi menerima security patch resmi. Untuk konteks PoC akademik, Fortress tetap relevan sebagai model konseptual ANSI RBAC (ANSI INCITS 359). Apabila proses build/integrasi gagal pada deadline yang ditentukan, alternatif yang dipertimbangkan adalah **Keycloak Authorization Services**, **Casbin**, atau **Open Policy Agent (OPA)**. Lihat Bab 14.1 PRD untuk detail mitigasi.
+> ⚠️ **Status Apache Fortress** — disepakati tim: cukup didemonstrasikan secara konseptual (PoC terbatas), tidak perlu integrasi penuh production-grade, karena indikasi proyek ini sudah masuk Apache Attic.
 
-## 6. Cara Menjalankan (akan diperbarui setiap tahap)
+## 6. Cara Menjalankan — Tahap 1 (Backend saja, tanpa Docker)
 
-Instruksi setup lengkap akan ditambahkan secara progresif di bagian ini seiring setiap tahap selesai diimplementasikan dan diverifikasi.
+Prasyarat di laptop Anda:
+- JDK 21
+- Maven 3.9+ (atau gunakan `./mvnw` jika sudah ada wrapper)
+- PostgreSQL 15+ berjalan lokal (atau lewat Docker, lihat Tahap 2 nanti)
+
+Langkah:
+
+```bash
+# 1. Generate keypair RSA untuk JWT (sekali saja)
+chmod +x scripts/generate-jwt-keypair.sh
+./scripts/generate-jwt-keypair.sh
+
+# 2. Buat database PostgreSQL kosong
+#    (sesuaikan nama db/user/password dengan .env Anda)
+createdb simpax
+
+# 3. Copy .env.example menjadi .env lalu isi kredensial
+cp .env.example .env
+
+# 4. Masuk ke folder backend
+cd simpax-app
+
+# 5. Build & jalankan (set env var sesuai .env Anda, atau export manual)
+export POSTGRES_DB=simpax
+export POSTGRES_USER=simpax_admin
+export POSTGRES_PASSWORD=<password_anda>
+
+mvn clean install
+mvn spring-boot:run -Dspring-boot.run.profiles=dev
+```
+
+Jika berhasil, aplikasi akan otomatis menjalankan migrasi Liquibase
+(membuat seluruh tabel + seed data 4 role) dan backend dapat diakses di
+`http://localhost:8080`.
+
+**Jika ada error saat `mvn clean install` atau saat start aplikasi, mohon
+kirimkan pesan error LENGKAP (jangan dipotong) agar dapat didiagnosa
+dengan tepat.**
+
+
 
 ---
 
