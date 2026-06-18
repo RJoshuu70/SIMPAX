@@ -1,0 +1,56 @@
+### === Java / Maven / Gradle (Backend JHipster - Spring Boot) === ###
+simpax-app/target/
+simpax-app/build/
+simpax-app/.mvn/wrapper/maven-wrapper.jar
+simpax-app/.gradle/
+*.class
+*.jar
+!**/wrapper/maven-wrapper.jar
+hs_err_pid*
+
+### === Node / React (Frontend JHipster) === ###
+simpax-app/node_modules/
+simpax-app/npm-debug.log
+simpax-app/yarn-error.log
+simpax-app/.npm/
+simpax-app/dist/
+simpax-app/build/webapp/
+simpax-app/webpack/
+
+### === JHipster generated transient files === ###
+simpax-app/.jhipster/
+simpax-app/.h2.server.properties
+simpax-app/*.log
+simpax-app/.angular-cache/
+simpax-app/.idea/
+simpax-app/*.iml
+
+### === Environment & Secrets (JANGAN PERNAH commit credential asli) === ###
+.env
+.env.local
+.env.*.local
+infra/**/secrets/
+infra/**/*.key
+infra/**/*.pem
+**/application-secrets.yml
+*.local.yml
+
+### === Docker volumes lokal (jika di-bind mount ke folder) === ###
+infra/postgres/data/
+infra/etcd/data/
+infra/syncope/data/
+
+### === IDE === ###
+.vscode/
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+
+### === OS === ###
+*.swp
+*.swo
+
+### === Logs === ###
+*.log
+logs/
