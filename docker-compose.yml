@@ -1,5 +1,3 @@
-version: "3.9"
-
 # ============================================================
 # Docker Compose - Tahap 2: PostgreSQL + Backend
 #

@@ -12,7 +12,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * dan security/, agar class ini tetap mudah dibaca sebagai titik masuk
  * murni tanpa logic tersembunyi.
  */
-@SpringBootApplication
+@SpringBootApplication(exclude = { org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration.class })
 public class SimpaxApp {
 
     public static void main(String[] args) {
