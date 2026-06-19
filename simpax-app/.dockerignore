@@ -1,0 +1,14 @@
+# File-file ini TIDAK BOLEH masuk ke dalam Docker build context,
+# baik karena tidak perlu (mempercepat build) maupun karena alasan
+# keamanan (private key tidak boleh ter-bake permanen ke dalam image).
+
+target/
+config/keys/
+*.pem
+*.key
+.env
+.env.local
+*.log
+.git/
+.idea/
+*.iml

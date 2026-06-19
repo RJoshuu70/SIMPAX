@@ -1,0 +1,35 @@
+# ===================================================================
+# Profile "docker" - dipakai saat backend berjalan SEBAGAI container
+# di dalam docker-compose, BUKAN saat development langsung di laptop.
+#
+# Perbedaan utama dengan application-dev.yml: POSTGRES_HOST defaultnya
+# adalah nama service Docker Compose ("postgres"), bukan "localhost" -
+# karena dari dalam container, "localhost" merujuk ke container itu
+# sendiri, BUKAN ke container Postgres yang terpisah. Komunikasi antar
+# container HARUS lewat nama service yang di-resolve oleh DNS internal
+# Docker Compose.
+# ===================================================================
+
+spring:
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:postgres}:${POSTGRES_PORT:5432}/${POSTGRES_DB:simpax}
+    username: ${POSTGRES_USER:simpax_admin}
+    password: ${POSTGRES_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+
+  jpa:
+    show-sql: false
+
+logging:
+  level:
+    id.ac.upnvj.simpax: INFO
+
+simpax:
+  security:
+    jwt:
+      private-key-path: ${JWT_PRIVATE_KEY_PATH:/app/config/keys/simpax-private.pem}
+      public-key-path: ${JWT_PUBLIC_KEY_PATH:/app/config/keys/simpax-public.pem}
+      token-validity-in-minutes: ${JWT_EXPIRY_MINUTES:15}
+      issuer: simpax-backend

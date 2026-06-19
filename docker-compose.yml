@@ -1,0 +1,92 @@
+version: "3.9"
+
+# ============================================================
+# Docker Compose - Tahap 2: PostgreSQL + Backend
+#
+# File ini akan DIPERLUAS pada tahap berikutnya untuk menambahkan
+# Apache APISIX, etcd, dan Apache Syncope (domain Zaskia) sebagai
+# service tambahan dalam network yang sama.
+#
+# Cara pakai:
+#   1. Pastikan file .env sudah ada di root project (copy dari .env.example)
+#   2. docker compose up -d --build
+#   3. docker compose logs -f backend   (untuk lihat log startup backend)
+#   4. docker compose down              (untuk stop & hapus container)
+#   5. docker compose down -v           (stop + HAPUS volume database -
+#      gunakan hati-hati, ini akan menghapus seluruh data!)
+# ============================================================
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: simpax-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-simpax}
+      POSTGRES_USER: ${POSTGRES_USER:-simpax_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme_local_dev_only}
+    ports:
+      # Port host:container - tetap di-expose ke host (localhost:5432)
+      # agar bisa diakses tools seperti DBeaver/pgAdmin untuk inspeksi
+      # manual saat development, walaupun backend mengaksesnya lewat
+      # network internal Docker (lihat DATASOURCE_URL pada service backend).
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      # Named volume - data PostgreSQL persisten walau container dihapus
+      # dan dibuat ulang (docker compose down tanpa -v aman untuk data).
+      - simpax_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      # pg_isready mengecek apakah PostgreSQL benar-benar siap menerima
+      # koneksi (bukan sekadar proses container sudah "Up"). Backend
+      # akan menunggu healthcheck ini "healthy" sebelum mencoba start
+      # (lihat depends_on di service backend).
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-simpax_admin} -d ${POSTGRES_DB:-simpax}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - simpax-network
+
+  backend:
+    build:
+      context: ./simpax-app
+      dockerfile: Dockerfile
+    container_name: simpax-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        # "service_healthy" - bukan sekadar "service_started". Ini mencegah
+        # race condition klasik: backend mencoba konek ke Postgres yang
+        # containernya sudah "Up" tapi proses Postgres di dalamnya belum
+        # selesai inisialisasi dan belum siap menerima koneksi.
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      POSTGRES_HOST: postgres   # nama service, di-resolve via DNS internal Docker Compose
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-simpax}
+      POSTGRES_USER: ${POSTGRES_USER:-simpax_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme_local_dev_only}
+      JWT_PRIVATE_KEY_PATH: /app/config/keys/simpax-private.pem
+      JWT_PUBLIC_KEY_PATH: /app/config/keys/simpax-public.pem
+      JWT_EXPIRY_MINUTES: ${JWT_EXPIRY_MINUTES:-15}
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    volumes:
+      # Mount keypair JWT dari host ke dalam container - file .pem TIDAK
+      # ikut di-build ke image (sudah di .dockerignore) demi keamanan,
+      # supaya private key tidak pernah tersimpan permanen di layer image
+      # yang berpotensi ter-push ke registry publik secara tidak sengaja.
+      - ./simpax-app/config/keys:/app/config/keys:ro
+    networks:
+      - simpax-network
+
+networks:
+  simpax-network:
+    # Network khusus SIMPAX - akan dipakai juga oleh APISIX/Syncope pada
+    # tahap berikutnya, supaya seluruh service saling terhubung dan dapat
+    # saling resolve nama service via DNS internal Docker.
+    driver: bridge
+
+volumes:
+  simpax_postgres_data:
