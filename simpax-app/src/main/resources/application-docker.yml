@@ -9,7 +9,6 @@
 # container HARUS lewat nama service yang di-resolve oleh DNS internal
 # Docker Compose.
 # ===================================================================
-
 spring:
   datasource:
     url: jdbc:postgresql://${POSTGRES_HOST:postgres}:${POSTGRES_PORT:5432}/${POSTGRES_DB:simpax}
@@ -18,9 +17,13 @@ spring:
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 10
-
   jpa:
     show-sql: false
+  ldap:
+    urls: ldap://openldap:389
+    base: dc=simpax,dc=local
+    username: cn=admin,dc=simpax,dc=local
+    password: ${LDAP_ADMIN_PASSWORD:ldap_admin_pass}
 
 logging:
   level:
@@ -33,3 +36,5 @@ simpax:
       public-key-path: ${JWT_PUBLIC_KEY_PATH:/app/config/keys/simpax-public.pem}
       token-validity-in-minutes: ${JWT_EXPIRY_MINUTES:15}
       issuer: simpax-backend
+  syncope:
+    base-url: http://syncope:8080

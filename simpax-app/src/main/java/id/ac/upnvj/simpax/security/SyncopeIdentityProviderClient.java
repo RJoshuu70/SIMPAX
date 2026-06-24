@@ -92,13 +92,14 @@ public class SyncopeIdentityProviderClient implements IdentityProviderClient {
         try {
             // Struktur request body sesuai Syncope 3.x User REST API.
             // Field "@class" wajib ada untuk polymorphic deserialization Syncope.
-            var userPayload = Map.of(
-                "@class", "org.apache.syncope.common.lib.to.UserTO",
-                "username", username,
-                "password", password,
-                "plainAttrs", java.util.List.of(
-                    Map.of("schema", "email", "values", java.util.List.of(email))
-                )
+           var userPayload = Map.of(
+                 "_class", "org.apache.syncope.common.lib.request.UserCR",
+                 "username", username,
+                 "password", password,
+                 "realm", "/",
+                 "plainAttrs", java.util.List.of(
+                   Map.of("schema", "email", "values", java.util.List.of(email))
+                  )
             );
 
             @SuppressWarnings("unchecked")
@@ -109,11 +110,18 @@ public class SyncopeIdentityProviderClient implements IdentityProviderClient {
                 .retrieve()
                 .body(Map.class);
 
-            if (response == null || !response.containsKey("key")) {
+            if (response == null || !response.containsKey("entity")) {
                 throw new IdentityProviderException("Syncope tidak mengembalikan key untuk user baru", null);
             }
 
-            String syncopeKey = response.get("key").toString();
+            @SuppressWarnings("unchecked")
+            Map<String, Object> entity = (Map<String, Object>) response.get("entity");
+            if (entity == null || !entity.containsKey("key")) {
+                throw new IdentityProviderException("Syncope tidak mengembalikan key untuk user baru", null);
+            }
+
+            String syncopeKey = entity.get("key").toString();
+
             log.info("User '{}' berhasil diregistrasi ke Syncope dengan key: {}", username, syncopeKey);
             return syncopeKey;
 

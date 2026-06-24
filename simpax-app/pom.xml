@@ -106,6 +106,19 @@
             <optional>true</optional>
         </dependency>
 
+        <!-- ====================== LDAP / Fortress RBAC ======================
+             Spring LDAP untuk koneksi ke OpenLDAP sebagai pengganti
+             fortress-core yang tidak kompatibel dengan Spring Boot 3.x.
+             Dipakai untuk query role assignment dari OpenLDAP. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-ldap</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.ldap</groupId>
+            <artifactId>spring-ldap-core</artifactId>
+        </dependency>
+
         <!-- ====================== Testing ====================== -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

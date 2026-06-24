@@ -4,12 +4,10 @@ import id.ac.upnvj.simpax.domain.User;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.security.Keys;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -31,6 +29,8 @@ import org.springframework.stereotype.Component;
  * - userId: UUID user, dipakai backend untuk lookup cepat tanpa query ulang
  * - role: nama role (STAFF/MANAGER/AUDITOR/DIREKSI) - akan dipakai APISIX
  *   maupun Spring Security untuk keputusan otorisasi (RBAC).
+ * - key: consumer key APISIX (sama dengan issuer), dipakai APISIX jwt-auth
+ *   plugin untuk mencocokkan token dengan consumer yang terdaftar.
  */
 @Component
 public class TokenProvider {
@@ -38,6 +38,7 @@ public class TokenProvider {
     private static final Logger log = LoggerFactory.getLogger(TokenProvider.class);
     private static final String CLAIM_USER_ID = "userId";
     private static final String CLAIM_ROLE = "role";
+    private static final String CLAIM_KEY = "key";
 
     private final PrivateKey privateKey;
     private final PublicKey publicKey;
@@ -62,6 +63,7 @@ public class TokenProvider {
             .subject(user.getUsername())
             .claim(CLAIM_USER_ID, user.getUserId().toString())
             .claim(CLAIM_ROLE, user.getRole().getRoleName())
+            .claim(CLAIM_KEY, jwtProperties.issuer())
             .issuer(jwtProperties.issuer())
             .issuedAt(java.util.Date.from(now))
             .expiration(java.util.Date.from(expiry))

@@ -1,0 +1,49 @@
+# ============================================================
+# Fortress RBAC Structure untuk SIMPAX
+# Load dengan: ldapadd -x -D "cn=admin,dc=simpax,dc=local" -w ldap_admin_pass -f fortress-rbac.ldif
+# ============================================================
+
+# Organizational Units
+dn: ou=People,dc=simpax,dc=local
+objectClass: organizationalUnit
+ou: People
+
+dn: ou=Roles,dc=simpax,dc=local
+objectClass: organizationalUnit
+ou: Roles
+
+dn: ou=Permissions,dc=simpax,dc=local
+objectClass: organizationalUnit
+ou: Permissions
+
+# ============================================================
+# Roles SIMPAX (sesuai PRD)
+# ============================================================
+
+dn: cn=STAFF,ou=Roles,dc=simpax,dc=local
+objectClass: top
+objectClass: groupOfNames
+cn: STAFF
+description: Staf Proyek - input transaksi
+member: uid=dummy,ou=People,dc=simpax,dc=local
+
+dn: cn=MANAGER,ou=Roles,dc=simpax,dc=local
+objectClass: top
+objectClass: groupOfNames
+cn: MANAGER
+description: Manajer Keuangan - approval pencairan
+member: uid=dummy,ou=People,dc=simpax,dc=local
+
+dn: cn=AUDITOR,ou=Roles,dc=simpax,dc=local
+objectClass: top
+objectClass: groupOfNames
+cn: AUDITOR
+description: Auditor - read-only seluruh data
+member: uid=dummy,ou=People,dc=simpax,dc=local
+
+dn: cn=DIREKSI,ou=Roles,dc=simpax,dc=local
+objectClass: top
+objectClass: groupOfNames
+cn: DIREKSI
+description: Direksi - dashboard dan laporan
+member: uid=dummy,ou=People,dc=simpax,dc=local

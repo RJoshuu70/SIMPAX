@@ -40,7 +40,27 @@ logging:
 simpax:
   security:
     jwt:
-      private-key-path: ${JWT_PRIVATE_KEY_PATH:config/keys/simpax-private.pem}
-      public-key-path: ${JWT_PUBLIC_KEY_PATH:config/keys/simpax-public.pem}
+      private-key-path: ${JWT_PRIVATE_KEY_PATH:/app/config/keys/simpax-private.pem}
+      public-key-path: ${JWT_PUBLIC_KEY_PATH:/app/config/keys/simpax-public.pem}
       token-validity-in-minutes: ${JWT_EXPIRY_MINUTES:15}
       issuer: simpax-backend
+
+# ===================================================================
+# Konfigurasi Spring LDAP → OpenLDAP (untuk FortressRbacService)
+# OpenLDAP berjalan sebagai container Docker di port 389
+# ===================================================================
+spring:
+  ldap:
+    urls: ldap://${LDAP_HOST:localhost}:${LDAP_PORT:389}
+    base: dc=simpax,dc=local
+    username: cn=admin,dc=simpax,dc=local
+    password: ${LDAP_ADMIN_PASSWORD:ldap_admin_pass}
+# ===================================================================
+# Konfigurasi Spring LDAP → OpenLDAP (untuk FortressRbacService)
+# ===================================================================
+spring:
+  ldap:
+    urls: ldap://${LDAP_HOST:localhost}:${FORTRESS_LDAP_PORT:389}
+    base: dc=simpax,dc=local
+    username: cn=admin,dc=simpax,dc=local
+    password: ${LDAP_ADMIN_PASSWORD:ldap_admin_pass}
