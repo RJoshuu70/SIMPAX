@@ -14,8 +14,11 @@ import java.util.Map;
 /**
  * Implementasi IdentityProviderClient yang memanggil Apache Syncope REST API.
  *
- * <p>CATATAN KOORDINASI TIM (untuk Zaskia):
- * Implementasi ini menggunakan endpoint Syncope berikut:
+ * <p>STATUS: Sudah diverifikasi end-to-end (register + login) terhadap
+ * Apache Syncope 4.1.1 yang berjalan di docker-compose - lihat
+ * docs/diagrams/kontrak_integrasi_syncope.md untuk catatan verifikasi.
+ *
+ * Endpoint Syncope yang dipakai:
  *
  * 1. Validasi kredensial (login):
  *    POST http://{SYNCOPE_HOST}:{SYNCOPE_PORT}/syncope/rest/accessTokens/login
@@ -24,18 +27,17 @@ import java.util.Map;
  *    Response gagal: 401 Unauthorized
  *
  * 2. Registrasi user baru:
- *    POST http://{SYNCOPE_HOST}:{SYNCOPE_PORT}/syncope/rest/users
+ *    POST http://{SYNCOPE_HOST}:{SYNCOPE_PORT}/syncope/rest/users?storePassword=true
  *    Header: Authorization: Basic base64(SYNCOPE_ADMIN:password)
- *    Body: JSON user object Syncope
+ *    Body: JSON UserCR Syncope - field discriminator "_class" (underscore,
+ *    BUKAN "@class") sesuai skema resmi di GET /syncope/rest/openapi.json
  *    Response sukses: 201 Created dengan body berisi user.key (syncopeRefId)
  *
- * Mohon Zaskia konfirmasi jika URL/endpoint Syncope yang dipakai berbeda
- * dari di atas (versi Syncope berbeda bisa punya path yang sedikit berbeda).
- *
- * <p>Konfigurasi yang dibutuhkan di application-dev.yml (ditambahkan nanti):
- *   simpax.syncope.base-url: http://localhost:8081
- *   simpax.syncope.admin-user: admin
- *   simpax.syncope.admin-password: (dari .env)
+ * <p>Konfigurasi yang dibutuhkan (sudah ada di application-dev.yml /
+ * application-docker.yml dan diteruskan via env var di docker-compose.yml):
+ *   simpax.syncope.base-url
+ *   simpax.syncope.admin-user
+ *   simpax.syncope.admin-password
  */
 @Component
 public class SyncopeIdentityProviderClient implements IdentityProviderClient {
@@ -90,8 +92,10 @@ public class SyncopeIdentityProviderClient implements IdentityProviderClient {
     @Override
     public String registerUser(String username, String email, String password) {
         try {
-            // Struktur request body sesuai Syncope 3.x User REST API.
-            // Field "@class" wajib ada untuk polymorphic deserialization Syncope.
+            // Struktur request body sesuai skema UserCR Syncope 4.1.1 (sudah
+            // dikonfirmasi via GET /syncope/rest/openapi.json di environment ini).
+            // Field "_class" (underscore, BUKAN "@class") wajib ada untuk
+            // polymorphic deserialization - field ini "required" di schema UserCR.
            var userPayload = Map.of(
                  "_class", "org.apache.syncope.common.lib.request.UserCR",
                  "username", username,

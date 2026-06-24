@@ -38,3 +38,5 @@ simpax:
       issuer: simpax-backend
   syncope:
     base-url: http://syncope:8080
+    admin-user: ${SYNCOPE_ADMIN_USER:admin}
+    admin-password: ${SYNCOPE_ADMIN_PASSWORD:password}
