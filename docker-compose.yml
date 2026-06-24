@@ -1,9 +1,9 @@
 # ============================================================
-# Docker Compose - Tahap 2: PostgreSQL + Backend
+# Docker Compose - Tahap 2 & 3: PostgreSQL + Backend + APISIX + etcd
 #
-# File ini akan DIPERLUAS pada tahap berikutnya untuk menambahkan
-# Apache APISIX, etcd, dan Apache Syncope (domain Zaskia) sebagai
-# service tambahan dalam network yang sama.
+# File ini DIPERLUAS dari versi Tahap 2 untuk menambahkan Apache
+# APISIX dan etcd (domain Zaskia). Apache Syncope dan Apache Fortress
+# akan ditambahkan pada tahap berikutnya.
 #
 # Cara pakai:
 #   1. Pastikan file .env sudah ada di root project (copy dari .env.example)
@@ -38,7 +38,11 @@ services:
       # koneksi (bukan sekadar proses container sudah "Up"). Backend
       # akan menunggu healthcheck ini "healthy" sebelum mencoba start
       # (lihat depends_on di service backend).
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-simpax_admin} -d ${POSTGRES_DB:-simpax}"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-simpax_admin} -d ${POSTGRES_DB:-simpax}",
+        ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -60,7 +64,7 @@ services:
         condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: docker
-      POSTGRES_HOST: postgres   # nama service, di-resolve via DNS internal Docker Compose
+      POSTGRES_HOST: postgres # nama service, di-resolve via DNS internal Docker Compose
       POSTGRES_PORT: 5432
       POSTGRES_DB: ${POSTGRES_DB:-simpax}
       POSTGRES_USER: ${POSTGRES_USER:-simpax_admin}
@@ -79,12 +83,72 @@ services:
     networks:
       - simpax-network
 
+  # ============================================================
+  # Tahap 3 - domain Zaskia: Apache APISIX + etcd
+  #
+  # etcd HARUS dinyalakan lebih dulu karena APISIX bergantung
+  # padanya sebagai configuration store (lihat deployment.etcd
+  # pada infra/apisix/apisix_conf/config.yaml).
+  #
+  # CATATAN PENTING: image etcd RESMI (gcr.io/etcd-development/etcd)
+  # TIDAK dikonfigurasi lewat environment variable seperti image
+  # turunan pihak ketiga (misal Bitnami) - binary etcd-nya dijalankan
+  # langsung lewat command-line flags, sesuai dokumentasi rilis resmi
+  # etcd-io/etcd. Tag v3.5.9 ini sudah terverifikasi jalan di
+  # environment Zaskia sebelumnya.
+  # ============================================================
+  etcd:
+    image: gcr.io/etcd-development/etcd:v3.5.9
+    container_name: simpax-etcd
+    restart: unless-stopped
+    entrypoint: /usr/local/bin/etcd
+    command:
+      - --name=simpax-etcd-node
+      - --data-dir=/etcd-data
+      - --listen-client-urls=http://0.0.0.0:2379
+      - --advertise-client-urls=http://etcd:2379
+      - --listen-peer-urls=http://0.0.0.0:2380
+      - --initial-advertise-peer-urls=http://etcd:2380
+      - --initial-cluster=simpax-etcd-node=http://etcd:2380
+      - --initial-cluster-token=simpax-etcd-token
+      - --initial-cluster-state=new
+      - --enable-v2=true
+    ports:
+      - "${ETCD_PORT:-2379}:2379"
+    volumes:
+      - simpax_etcd_data:/etcd-data
+    networks:
+      - simpax-network
+
+  apisix:
+    image: apache/apisix:3.10.0-debian
+    container_name: simpax-apisix
+    restart: unless-stopped
+    depends_on:
+      - etcd
+      # CATATAN: sengaja TIDAK depends_on backend dengan condition
+      # service_healthy. APISIX tetap boleh start meski backend belum
+      # siap - request akan diteruskan APISIX ke backend hanya saat
+      # ada trafik masuk, bukan saat startup. Mencegah dependency
+      # chain yang terlalu kaku antar tim.
+    environment:
+      APISIX_ADMIN_KEY: ${APISIX_ADMIN_KEY:-ganti_dengan_admin_key_apisix}
+    ports:
+      - "${APISIX_HTTP_PORT:-9080}:9080" # gateway - trafik bisnis lewat sini
+      - "${APISIX_ADMIN_PORT:-9180}:9180" # admin API - konfigurasi route/consumer
+    volumes:
+      - ./infra/apisix/apisix_conf/config.yaml:/usr/local/apisix/conf/config.yaml:ro
+    networks:
+      - simpax-network
+
 networks:
   simpax-network:
-    # Network khusus SIMPAX - akan dipakai juga oleh APISIX/Syncope pada
-    # tahap berikutnya, supaya seluruh service saling terhubung dan dapat
-    # saling resolve nama service via DNS internal Docker.
+    # Network khusus SIMPAX - dipakai bersama oleh Backend, APISIX,
+    # etcd, Syncope, dan Fortress (tahap selanjutnya) agar seluruh
+    # service saling terhubung dan dapat saling resolve nama service
+    # via DNS internal Docker.
     driver: bridge
 
 volumes:
   simpax_postgres_data:
+  simpax_etcd_data:

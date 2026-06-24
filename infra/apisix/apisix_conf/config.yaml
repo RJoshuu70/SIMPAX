@@ -1,0 +1,44 @@
+# ===================================================================
+# Konfigurasi Apache APISIX untuk SIMPAX (Tahap 3 - domain Zaskia)
+#
+# Mode yang dipakai: "traditional" - satu instance APISIX berperan
+# sekaligus sebagai control plane (Admin API, port 9180) dan data
+# plane (gateway lalu lintas request, port 9080). Ini paling sesuai
+# untuk PoC akademik skala kecil; mode "decoupled" (control plane dan
+# data plane terpisah) baru relevan untuk kebutuhan produksi skala
+# besar yang butuh scaling independen.
+#
+# Referensi resmi: https://apisix.apache.org/docs/apisix/deployment-modes/
+# ===================================================================
+
+deployment:
+  role: traditional
+  role_traditional:
+    config_provider: etcd
+
+  admin:
+    # allow_admin membatasi IP mana saja yang boleh memanggil Admin API
+    # (port 9180). Di sini dibatasi ke subnet Docker Compose internal
+    # ("simpax-network") plus localhost, BUKAN 0.0.0.0/0, karena
+    # 0.0.0.0/0 berarti siapapun di internet bisa mengubah seluruh
+    # konfigurasi gateway tanpa batasan jaringan - ini eksplisit
+    # diperingatkan sebagai praktik tidak aman pada dokumentasi resmi
+    # APISIX.
+    allow_admin:
+      - 127.0.0.1/32
+      - 172.16.0.0/12 # default range subnet bridge Docker Compose
+
+    admin_key:
+      - name: admin
+        key: ${{APISIX_ADMIN_KEY}}
+        role: admin
+
+  etcd:
+    host:
+      - "http://etcd:2379" # nama service Docker, BUKAN localhost
+    prefix: "/apisix"
+    timeout: 30
+
+apisix:
+  node_listen: 9080
+  enable_admin_ui: false # Dashboard terpisah, tidak dibutuhkan untuk PoC ini
