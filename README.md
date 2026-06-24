@@ -55,14 +55,16 @@ simpax/
 - [x] Tahap 0 — Struktur repo & skeleton dasar
 - [x] Tahap 1 — Backend skeleton (entity, repository, JWT RS256) ✅ **Terverifikasi: build sukses, 30 file Java compile tanpa error**
 - [x] Tahap 2 — Docker Compose (Backend + PostgreSQL) ✅ **Terverifikasi: container Up & Healthy, Liquibase migrate sukses (7 changeset), actuator health UP, JWKS endpoint mengembalikan public key valid**
-- [ ] Tahap 3 — Integrasi Apache APISIX + etcd *(domain: Zaskia)*
-- [ ] Tahap 4 — Integrasi Apache Syncope (IAM) *(domain: Zaskia)*
-- [ ] Tahap 5 — Integrasi Apache Fortress (RBAC) — **cukup demonstrasi konsep** *(domain: Zaskia)*
+- [x] Tahap 3 — Integrasi Apache APISIX + etcd *(domain: Zaskia)* ✅ **Terverifikasi: APISIX (traditional mode) + etcd Up, Admin API dibatasi ke subnet internal, `sync_jwks_to_apisix.py` berhasil mendaftarkan Consumer `jwt-auth` dari JWKS backend**
+- [x] Tahap 4/5 — Integrasi Apache Fortress RBAC via OpenLDAP *(domain: Zaskia)* ✅ **Terverifikasi: struktur LDIF (Roles: STAFF/MANAGER/AUDITOR/DIREKSI) ter-load ke OpenLDAP, `FortressRbacService` melakukan RBAC check granular per-request di `BudgetsTransactionController`** — *(catatan: fortress-core tidak dipakai langsung karena tidak kompatibel Spring Boot 3.x; diganti Spring LDAP query ke OpenLDAP sebagai PoC konsep RBAC, sesuai catatan risiko §5)*
+- [ ] Tahap 4b — Integrasi Apache Syncope (IAM) penuh *(domain: Zaskia, container sudah Up tapi belum dikoneksikan ke alur auth utama — lihat catatan §5)*
 - [ ] Tahap 6 — Modul bisnis (Kalkulator Pajak, Kwitansi & Faktur, Saldo & Saham)
 - [ ] Tahap 7 — Dashboard, Audit Trail UI, Landing Page
 - [ ] Tahap 8 — Laporan akademik final
 
-> **Pembagian tugas tim:** Joshua (Backend Dev) — Zaskia (Security & Config Engineer) — Sekar (Security Tester) — Regina (Monitoring, Deployment & Dokumentasi). Detail di [`docs/diagrams/pembagian_tugas.md`](docs/diagrams/pembagian_tugas.md).
+> **Pengujian:** instruksi pengujian untuk 3 komponen Apache (APISIX, OpenLDAP/Fortress RBAC, dan integrasi end-to-end JWT → Gateway → RBAC) tersedia di [`docs/pengujian/TEST_GUIDE_APACHE_STACK.md`](docs/pengujian/TEST_GUIDE_APACHE_STACK.md).
+
+> **Pembagian tugas tim:** Joshua (Backend Dev) — Zaskia (Security & Config Engineer) — Sekar (Security Tester) — Regina (Monitoring, Deployment & Dokumentasi).
 
 ## 5. Catatan Risiko Penting
 
@@ -115,7 +117,39 @@ docker compose down -v    # stop & HAPUS volume database juga (hati-hati, data h
 yang dapat dikonfigurasikan langsung pada plugin `jwt-auth` Apache APISIX untuk verifikasi
 token tanpa perlu copy-paste manual.
 
+## 7. Cara Menjalankan — Tahap 3: APISIX + etcd + OpenLDAP (Fortress RBAC)
 
+**Status: terverifikasi berhasil.** Stack penuh sekarang mencakup: PostgreSQL, Backend,
+etcd, Apache APISIX, Apache Syncope (container, belum terhubung ke alur auth), dan OpenLDAP
+(menyimpan struktur role untuk Fortress RBAC PoC).
+
+Langkah tambahan setelah Tahap 1 & 2 di atas:
+
+```bash
+# 1. Jalankan seluruh stack
+docker compose up -d --build
+
+# 2. Pastikan semua container Up
+docker compose ps
+
+# 3. Load struktur RBAC (Roles: STAFF/MANAGER/AUDITOR/DIREKSI) ke OpenLDAP
+docker cp infra/fortress/fortress-rbac.ldif simpax-openldap:/tmp/fortress-rbac.ldif
+docker exec simpax-openldap ldapadd -x \
+  -D "cn=admin,dc=simpax,dc=local" \
+  -w "$LDAP_ADMIN_PASSWORD" \
+  -f /tmp/fortress-rbac.ldif
+
+# 4. Sinkronkan JWKS backend ke APISIX (mendaftarkan Consumer jwt-auth, RS256)
+pip install requests cryptography --break-system-packages
+python3 sync_jwks_to_apisix.py \
+  --jwks-url http://localhost:8080/.well-known/jwks.json \
+  --apisix-admin-url http://localhost:9180 \
+  --apisix-admin-key "$APISIX_ADMIN_KEY" \
+  --consumer-key simpax-backend
+```
+
+> Panduan pengujian lengkap (test case untuk APISIX, OpenLDAP/Fortress RBAC, dan integrasi
+> end-to-end) ada di [`docs/pengujian/TEST_GUIDE_APACHE_STACK.md`](docs/pengujian/TEST_GUIDE_APACHE_STACK.md) — dipersiapkan untuk Sekar (Security Tester).
 
 ---
 
