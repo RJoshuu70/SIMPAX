@@ -1,0 +1,248 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!-- ============================================================
+         CHANGESET 1: Tabel roles
+         Dibuat PERTAMA karena tabel app_user akan memiliki Foreign Key
+         ke tabel ini - urutan pembuatan tabel di Liquibase HARUS mengikuti
+         urutan dependency (parent sebelum child), kalau tidak akan error
+         "relation roles does not exist" saat constraint FK dibuat.
+         ============================================================ -->
+    <changeSet id="00000000000001-1" author="joshua">
+        <createTable tableName="roles">
+            <column name="role_id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="role_name" type="VARCHAR(50)">
+                <constraints nullable="false" unique="true" uniqueConstraintName="ux_roles_role_name"/>
+            </column>
+            <column name="hierarchy_level" type="INT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="description" type="TEXT"/>
+        </createTable>
+    </changeSet>
+
+    <!-- ============================================================
+         CHANGESET 2: Tabel app_user
+         Nama tabel sengaja "app_user" bukan "users" untuk menghindari
+         konflik dengan reserved keyword pada beberapa dialek SQL.
+         Keputusan ini sudah dikonfirmasi bersama Joshua (Backend Dev).
+         ============================================================ -->
+    <changeSet id="00000000000001-2" author="joshua">
+        <createTable tableName="app_user">
+            <column name="user_id" type="UUID">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="username" type="VARCHAR(100)">
+                <constraints nullable="false" unique="true" uniqueConstraintName="ux_app_user_username"/>
+            </column>
+            <column name="email" type="VARCHAR(150)">
+                <constraints nullable="false" unique="true" uniqueConstraintName="ux_app_user_email"/>
+            </column>
+            <column name="syncope_ref_id" type="VARCHAR(100)">
+                <constraints nullable="false" unique="true" uniqueConstraintName="ux_app_user_syncope_ref_id"/>
+            </column>
+            <column name="role_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="is_active" type="BOOLEAN" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="last_login_at" type="TIMESTAMP WITH TIME ZONE"/>
+        </createTable>
+
+        <addForeignKeyConstraint
+            baseTableName="app_user"
+            baseColumnNames="role_id"
+            constraintName="fk_app_user_role_id"
+            referencedTableName="roles"
+            referencedColumnNames="role_id"/>
+    </changeSet>
+
+    <!-- ============================================================
+         CHANGESET 3: Tabel budgets_transactions
+         Memiliki DUA foreign key ke app_user (created_by, approved_by) -
+         keduanya didefinisikan sebagai constraint terpisah dengan nama
+         eksplisit agar mudah ditelusuri saat membaca error log database.
+         ============================================================ -->
+    <changeSet id="00000000000001-3" author="joshua">
+        <createTable tableName="budgets_transactions">
+            <column name="transaction_id" type="UUID">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="amount" type="DECIMAL(18,2)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="tax_amount" type="DECIMAL(18,2)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="status" type="VARCHAR(20)" defaultValue="PENDING">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_by" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+            <column name="approved_by" type="UUID"/>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="approved_at" type="TIMESTAMP WITH TIME ZONE"/>
+        </createTable>
+
+        <addForeignKeyConstraint
+            baseTableName="budgets_transactions"
+            baseColumnNames="created_by"
+            constraintName="fk_budgets_transactions_created_by"
+            referencedTableName="app_user"
+            referencedColumnNames="user_id"/>
+
+        <addForeignKeyConstraint
+            baseTableName="budgets_transactions"
+            baseColumnNames="approved_by"
+            constraintName="fk_budgets_transactions_approved_by"
+            referencedTableName="app_user"
+            referencedColumnNames="user_id"/>
+
+        <!-- Check constraint sebagai lapisan pertahanan TERAKHIR di level
+             database untuk prinsip Separation of Duties: walaupun validasi
+             utama SoD dilakukan di Service layer Java, constraint ini
+             mencegah satu baris transaksi punya created_by == approved_by
+             bahkan jika ada yang mencoba INSERT langsung lewat SQL manual
+             (misal lewat psql tanpa lewat aplikasi) - defense in depth. -->
+        <sql>
+            ALTER TABLE budgets_transactions
+            ADD CONSTRAINT chk_budgets_transactions_sod
+            CHECK (approved_by IS NULL OR approved_by != created_by);
+        </sql>
+    </changeSet>
+
+    <!-- ============================================================
+         CHANGESET 4: Tabel wallet_balances (modul tambahan - saldo)
+         ============================================================ -->
+    <changeSet id="00000000000001-4" author="joshua">
+        <createTable tableName="wallet_balances">
+            <column name="wallet_id" type="UUID">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="user_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+            <column name="cash_balance" type="DECIMAL(18,2)" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="currency" type="VARCHAR(10)" defaultValue="IDR">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <addForeignKeyConstraint
+            baseTableName="wallet_balances"
+            baseColumnNames="user_id"
+            constraintName="fk_wallet_balances_user_id"
+            referencedTableName="app_user"
+            referencedColumnNames="user_id"/>
+    </changeSet>
+
+    <!-- ============================================================
+         CHANGESET 5: Tabel stock_holdings (modul tambahan - saham)
+         ============================================================ -->
+    <changeSet id="00000000000001-5" author="joshua">
+        <createTable tableName="stock_holdings">
+            <column name="holding_id" type="UUID">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="user_id" type="UUID">
+                <constraints nullable="false"/>
+            </column>
+            <column name="ticker_symbol" type="VARCHAR(10)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="exchange" type="VARCHAR(20)" defaultValue="IDX">
+                <constraints nullable="false"/>
+            </column>
+            <column name="quantity" type="DECIMAL(18,4)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="avg_buy_price" type="DECIMAL(18,2)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <addForeignKeyConstraint
+            baseTableName="stock_holdings"
+            baseColumnNames="user_id"
+            constraintName="fk_stock_holdings_user_id"
+            referencedTableName="app_user"
+            referencedColumnNames="user_id"/>
+
+        <!-- Index pada ticker_symbol: tabel ini akan sering di-query/filter
+             berdasarkan ticker saat menampilkan portofolio user atau saat
+             proses refresh harga cache - index mempercepat lookup tersebut
+             tanpa perlu full table scan. -->
+        <createIndex indexName="idx_stock_holdings_ticker_symbol" tableName="stock_holdings">
+            <column name="ticker_symbol"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- ============================================================
+         CHANGESET 6: Tabel stock_price_caches (modul tambahan - resilience)
+         ============================================================ -->
+    <changeSet id="00000000000001-6" author="joshua">
+        <createTable tableName="stock_price_caches">
+            <column name="ticker_symbol" type="VARCHAR(10)">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="exchange" type="VARCHAR(20)" defaultValue="IDX">
+                <constraints nullable="false"/>
+            </column>
+            <column name="last_price" type="DECIMAL(18,2)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="fetched_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <!-- ============================================================
+         CHANGESET 7: Seed data Role
+         Data awal role sesuai 3 persona pada PRD Bab 2.3, plus DIREKSI
+         yang disebut pada Bab 6.3 sebagai role dengan full access.
+         hierarchy_level: semakin tinggi nilai = semakin tinggi privilege,
+         konsisten dengan deskripsi kolom pada PRD Bab 10.2.
+         ============================================================ -->
+    <changeSet id="00000000000001-7" author="joshua">
+        <insert tableName="roles">
+            <column name="role_name" value="STAFF"/>
+            <column name="hierarchy_level" valueNumeric="1"/>
+            <column name="description" value="Staf Proyek - input transaksi, tanpa kewenangan approval"/>
+        </insert>
+        <insert tableName="roles">
+            <column name="role_name" value="MANAGER"/>
+            <column name="hierarchy_level" valueNumeric="2"/>
+            <column name="description" value="Manajer Keuangan - approval/reject transaksi"/>
+        </insert>
+        <insert tableName="roles">
+            <column name="role_name" value="AUDITOR"/>
+            <column name="hierarchy_level" valueNumeric="2"/>
+            <column name="description" value="Auditor/Admin Security - read-only audit trail, kelola identitas"/>
+        </insert>
+        <insert tableName="roles">
+            <column name="role_name" value="DIREKSI"/>
+            <column name="hierarchy_level" valueNumeric="3"/>
+            <column name="description" value="Direksi - full access"/>
+        </insert>
+    </changeSet>
+
+</databaseChangeLog>

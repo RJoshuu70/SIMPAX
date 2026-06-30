@@ -1,0 +1,58 @@
+# ===================================================================
+# Konfigurasi dasar SIMPAX Backend (berlaku untuk semua profile)
+# Konfigurasi spesifik per environment ada di application-dev.yml
+# dan application-prod.yml (dipisah agar tidak tercampur - prinsip
+# 12-factor app: config terpisah dari code).
+# ===================================================================
+
+spring:
+  application:
+    name: simpax-app
+
+  liquibase:
+    change-log: classpath:config/liquibase/master.xml
+    # contexts kosong = jalankan semua changeSet tanpa filter context.
+    # Akan dimanfaatkan nanti jika perlu changeSet khusus "test-data-only"
+    # yang tidak ikut jalan di production.
+    contexts: ""
+
+  jpa:
+    # PENTING: ddl-auto SELALU "none" karena skema database SUDAH
+    # dikelola penuh oleh Liquibase. Jika ddl-auto diaktifkan (misal
+    # "update"), Hibernate akan mencoba mengubah skema sendiri secara
+    # otomatis, yang bisa BERTABRAKAN dengan migrasi Liquibase dan
+    # menyebabkan skema database menjadi tidak konsisten/tidak
+    # terprediksi antara satu environment dengan environment lain.
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+        # Memberi tahu Hibernate dialect database secara eksplisit,
+        # daripada mengandalkan auto-detection yang kadang keliru
+        # pada versi PostgreSQL tertentu.
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  jackson:
+    time-zone: UTC
+    serialization:
+      write-dates-as-timestamps: false
+
+server:
+  port: ${BACKEND_PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        # Hanya expose endpoint actuator yang benar-benar perlu untuk
+        # health-check (akan dipakai Regina untuk monitoring SkyWalking/
+        # HertzBeat). Endpoint sensitif lain (env, beans, dll) SENGAJA
+        # tidak di-expose tanpa otentikasi tambahan - relevan dengan
+        # prinsip least privilege pada OWASP API Security Top 10.
+        include: health,info
+  endpoint:
+    health:
+      show-details: when-authorized

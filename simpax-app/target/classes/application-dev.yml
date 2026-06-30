@@ -1,0 +1,59 @@
+# ===================================================================
+# Profile "dev" - dipakai saat development lokal di laptop masing-masing
+# anggota tim, ataupun saat berjalan di dalam docker-compose lokal.
+# Aktifkan profile ini dengan: -Dspring.profiles.active=dev
+# (atau di IDE: set Active profiles = dev pada run configuration)
+# ===================================================================
+
+spring:
+  datasource:
+    # Nilai diambil dari environment variable agar kredensial TIDAK
+    # hardcode di file yang ter-commit ke Git - selaras dengan .env.example
+    # yang sudah disiapkan di root repo. Nilai fallback setelah ":" hanya
+    # untuk kenyamanan development lokal tanpa file .env, BUKAN untuk
+    # dipakai di production.
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:simpax}
+    username: ${POSTGRES_USER:simpax_admin}
+    password: ${POSTGRES_PASSWORD:changeme_local_dev_only}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      # Connection pool kecil cukup untuk kebutuhan development/demo,
+      # bukan untuk production traffic sesungguhnya.
+      maximum-pool-size: 5
+
+  jpa:
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  # Konfigurasi Spring LDAP → OpenLDAP (untuk FortressRbacService).
+  # OpenLDAP berjalan sebagai container Docker, port host dikontrol oleh
+  # FORTRESS_LDAP_PORT di .env/.env.example (bukan LDAP_PORT).
+  ldap:
+    urls: ldap://${LDAP_HOST:localhost}:${FORTRESS_LDAP_PORT:389}
+    base: dc=simpax,dc=local
+    username: cn=admin,dc=simpax,dc=local
+    password: ${LDAP_ADMIN_PASSWORD:ldap_admin_pass}
+
+logging:
+  level:
+    id.ac.upnvj.simpax: DEBUG
+    org.hibernate.SQL: DEBUG
+
+# ===================================================================
+# Konfigurasi JWT RS256 - lihat security.jwt.TokenProvider
+# Path keypair akan digenerate via script terpisah (lihat scripts/),
+# JANGAN commit file .pem/.key asli ke Git (sudah masuk .gitignore).
+# ===================================================================
+simpax:
+  security:
+    jwt:
+      private-key-path: ${JWT_PRIVATE_KEY_PATH:/app/config/keys/simpax-private.pem}
+      public-key-path: ${JWT_PUBLIC_KEY_PATH:/app/config/keys/simpax-public.pem}
+      token-validity-in-minutes: ${JWT_EXPIRY_MINUTES:15}
+      issuer: simpax-backend
+  syncope:
+    base-url: http://${SYNCOPE_HOST:localhost}:${SYNCOPE_PORT:8081}
+    admin-user: ${SYNCOPE_ADMIN_USER:admin}
+    admin-password: ${SYNCOPE_ADMIN_PASSWORD:password}

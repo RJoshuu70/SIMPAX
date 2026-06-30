@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -44,6 +45,24 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleIdentityProvider(IdentityProviderException e) {
         log.error("Identity Provider error: {}", e.getMessage(), e);
         return errorResponse(HttpStatus.SERVICE_UNAVAILABLE, e.getMessage());
+    }
+
+    /**
+     * PENTING: handler ini WAJIB ada secara eksplisit, terpisah dari
+     * catch-all Exception.class di bawah. Tanpa ini, AccessDeniedException
+     * (dilempar misalnya oleh WalletBalanceService saat user mencoba akses
+     * wallet milik orang lain) akan tertangkap oleh handler generik
+     * Exception.class dan keliru dikembalikan sebagai 500 Internal Server
+     * Error - padahal secara semantik HTTP ini seharusnya 403 Forbidden.
+     * Spring memilih @ExceptionHandler berdasarkan exception type PALING
+     * SPESIFIK yang cocok, jadi method ini otomatis diprioritaskan
+     * dibanding handleGeneral() untuk exception jenis ini - tidak perlu
+     * urutan deklarasi khusus.
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<Map<String, Object>> handleAccessDenied(AccessDeniedException e) {
+        log.warn("Access denied: {}", e.getMessage());
+        return errorResponse(HttpStatus.FORBIDDEN, e.getMessage());
     }
 
     @ExceptionHandler(Exception.class)
