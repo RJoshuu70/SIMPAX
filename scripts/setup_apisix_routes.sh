@@ -11,10 +11,27 @@
 #   1. simpax-auth-public   -> /api/auth/*  dan /.well-known/jwks.json
 #      Tanpa plugin jwt-auth (memang belum punya token saat login/register).
 #      Plugin limit-count dipasang untuk mitigasi brute-force.
-#   2. simpax-api-protected -> /api/transactions/*
+#   2. simpax-api-protected -> /api/* (CATCH-ALL, direvisi dari semula
+#      hanya /api/transactions/*)
 #      Plugin jwt-auth AKTIF, key_claim_name diset "iss" (BUKAN default "key")
 #      karena TokenProvider.java menyisipkan klaim "iss", bukan "key" -
 #      lihat catatan di sync_jwks_to_apisix.py.
+#
+#      KEPUTUSAN ARSITEKTUR (revisi): semula route #2 didaftarkan SPESIFIK
+#      per modul ("/api/transactions/*" saja). Begitu modul Saldo & Saham
+#      (/api/wallets, /api/stocks) ditambahkan, pendekatan itu jadi rapuh -
+#      setiap modul baru (nanti: /api/tax, /api/receipts) butuh edit script
+#      ini lagi dan re-run setup_apisix_routes.sh, padahal mudah lupa. Maka
+#      route #2 digeneralisasi jadi "/api/*" sebagai catch-all untuk semua
+#      endpoint terlindungi. APISIX memilih route paling SPESIFIK dulu saat
+#      ada beberapa route yang match (longest prefix match), jadi
+#      "/api/auth/*" tetap menang dibanding "/api/*" untuk request ke
+#      /api/auth/login - tidak ada konflik. Trade-off: rate-limit jadi
+#      seragam 100 req/menit untuk SEMUA endpoint terlindungi, tidak lagi
+#      bisa diatur berbeda per modul lewat route APISIX (kalau suatu saat
+#      perlu rate-limit lebih ketat khusus modul tertentu, itu perlu route
+#      terpisah lagi dengan uri lebih spesifik didaftarkan SEBELUM catch-all
+#      ini).
 #
 # Otorisasi by-role (STAFF/MANAGER/AUDITOR/DIREKSI) TETAP di backend
 # (SecurityConfig.java) - APISIX di sini hanya validasi signature JWT,
@@ -64,6 +81,7 @@ curl -sS -X PUT "$APISIX_ADMIN_URL/apisix/admin/routes/simpax-auth-public" \
   -d '{
     "uri": "/api/auth/*",
     "methods": ["POST", "OPTIONS"],
+    "priority": 10,
     "plugins": {
       "limit-count": {
         "count": 10,
@@ -90,6 +108,7 @@ curl -sS -X PUT "$APISIX_ADMIN_URL/apisix/admin/routes/simpax-jwks-public" \
   -d '{
     "uri": "/.well-known/jwks.json",
     "methods": ["GET", "OPTIONS"],
+    "priority": 10,
     "upstream": {
       "type": "roundrobin",
       "nodes": {
@@ -100,19 +119,22 @@ curl -sS -X PUT "$APISIX_ADMIN_URL/apisix/admin/routes/simpax-jwks-public" \
 echo ""
 
 # ---------------------------------------------------------------------
-# Route 2: Endpoint terlindungi (transaksi) - WAJIB jwt-auth valid.
+# Route 2: Endpoint terlindungi (CATCH-ALL /api/*) - WAJIB jwt-auth valid.
 # key_claim_name "iss" karena TokenProvider.java pakai klaim "iss",
 # bukan "key" (lihat sync_jwks_to_apisix.py untuk penjelasan lengkap).
+# Mencakup /api/transactions/*, /api/wallets/*, /api/stocks/*, dan modul
+# Tahap 6 berikutnya (/api/tax, /api/receipts) - TIDAK perlu didaftarkan
+# satu-satu lagi (lihat catatan keputusan arsitektur di atas).
 # Otorisasi per-role (MANAGER/DIREKSI utk approve/reject, dst) sudah
 # ditangani backend sendiri lewat SecurityConfig.java - TIDAK didobel
 # di sini.
 # ---------------------------------------------------------------------
-echo "[INFO] Mendaftarkan route 'simpax-api-protected' ..."
+echo "[INFO] Mendaftarkan route 'simpax-api-protected' (catch-all /api/*) ..."
 curl -sS -X PUT "$APISIX_ADMIN_URL/apisix/admin/routes/simpax-api-protected" \
   -H "X-API-KEY: $ADMIN_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "uris": ["/api/transactions", "/api/transactions/*"],
+    "uri": "/api/*",
     "plugins": {
       "jwt-auth": {
         "key_claim_name": "iss"
